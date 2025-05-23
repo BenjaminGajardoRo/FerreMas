@@ -189,9 +189,9 @@ async def listar_promociones(token: str = Depends(verificar_token_general)):
 async def contacto_vendedor(mensaje: dict, token: str = Depends(verificar_token_general)):
     return await enviar_a_api_post("/data/contacto/vendedor", mensaje, token)
 
-@app.get("/data/vendedores/bySucursal", tags=["Vendedores"])
+@app.get("/data/vendedores/porSucursal", tags=["Vendedores"])
 async def listar_vendedores_por_sucursal(
-    sucursal_id: str = Query(..., alias="sucursalId"),
+    sucursal_id: str = Query(..., alias="sucursal_Id"),
     token: str = Depends(verificar_token_general),
     vendor_token: str = Depends(verificar_token_vendedor)
 ):
