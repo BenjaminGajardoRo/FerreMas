@@ -7,8 +7,8 @@ import stripe, os
 from dotenv import load_dotenv
 
 app = FastAPI(
-    title="API's de I. de Plataformas",
-    description="Todas las API's de I. de Plataformas",
+    title="API FERREMAS DUOC",
+    description="AAAAAAAAA LOCURA A LAS 3 AM",
     version="1.0.0",
 )
 
