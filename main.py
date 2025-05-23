@@ -116,6 +116,7 @@ async def crear_sesion_pago(items: list[ProductoPago]):
             line_items=line_items,
             success_url="https://tusitio.com/success",
             cancel_url="https://tusitio.com/cancel"
+            "https://docs.stripe.com/payments/checkout/custom-success-page?payment-ui=stripe-hosted",
         )
         return {"url": sesion_pago.url}
     except Exception as e:
