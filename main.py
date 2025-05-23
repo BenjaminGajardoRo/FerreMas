@@ -114,8 +114,8 @@ async def crear_sesion_pago(items: list[ProductoPago]):
             payment_method_types=["card"],
             mode="payment",
             line_items=line_items,
-            success_url="https://ferremas-front.vercel.app/success",
-            cancel_url="https://ferremas-front.vercel.app/cancel"
+            success_url="https://tusitio.com/success",
+            cancel_url="https://tusitio.com/cancel"
         )
         return {"url": sesion_pago.url}
     except Exception as e:
