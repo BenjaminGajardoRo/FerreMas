@@ -22,7 +22,6 @@ app.add_middleware(
 
 load_dotenv()
 
-# Variables de entorno (sin cambios)
 API_BASE = os.getenv("API_BASE")
 FIXED_TOKEN = os.getenv("TOKEN_FIJO")
 VENDOR_ALLOW_TOKEN = os.getenv("TOKEN_VENDEDOR_PERMITIDO")
@@ -38,7 +37,6 @@ usuarios_autorizados = [
     {"usuario": "Admin", "contrasena": "1234", "rol": "admin"},
 ]
 
-# Modelo para items en Stripe
 class ProductoPago(BaseModel):
     id: str
     nombre: str
@@ -58,27 +56,22 @@ def verificar_token_vendedor(x_vendor_token: str = Header(None, alias="x-vendor-
         raise HTTPException(403, "No tienes permiso para este recurso")
     return x_vendor_token
 
-# Función auxiliar para solicitudes GET a la API base
 async def obtener_desde_api(path: str, token: str):
     headers = {"x-authentication": token}
     async with httpx.AsyncClient() as cliente:
         respuesta = await cliente.get(f"{API_BASE}{path}", headers=headers)
         return JSONResponse(status_code=respuesta.status_code, content=respuesta.json())
 
-# Función auxiliar para solicitudes POST a la API base
 async def enviar_a_api_post(path: str, datos: dict, token: str):
     headers = {"x-authentication": token}
     async with httpx.AsyncClient() as cliente:
         respuesta = await cliente.post(f"{API_BASE}{path}", json=datos, headers=headers)
         return JSONResponse(status_code=respuesta.status_code, content=respuesta.json())
-
-# Función auxiliar para solicitudes PUT a la API base
 async def enviar_a_api_put(path: str, headers: dict):
     async with httpx.AsyncClient() as cliente:
         respuesta = await cliente.put(f"{API_BASE}{path}", headers=headers)
         return JSONResponse(status_code=respuesta.status_code, content=respuesta.json())
 
-# Ruta para login y autenticación
 @app.post("/autenticacion", tags=["Auth"])
 async def login_usuario(credenciales: dict):
     usuario = credenciales.get("user")
@@ -88,8 +81,7 @@ async def login_usuario(credenciales: dict):
             token_vendedor = VENDOR_DENY_TOKEN if u["rol"] == "service_account" else VENDOR_ALLOW_TOKEN
             return {"token": FIXED_TOKEN, "rol": u["rol"], "vendorToken": token_vendedor}
     raise HTTPException(status_code=401, detail="Credenciales inválidas")
-
-# Ruta para conversión de divisas
+    
 @app.get("/currency", tags=["Divisas"])
 async def convertir_divisa(
     moneda_origen: str = Query(..., min_length=3, max_length=3),
@@ -106,7 +98,6 @@ async def convertir_divisa(
         raise HTTPException(status_code=400, detail="Código de moneda inválido")
     return {"rate": tasa}
 
-# Crear sesión de pago Stripe
 @app.post("/create-checkout-session", tags=["Stripe"])
 async def crear_sesion_pago(items: list[ProductoPago]):
     try:
@@ -130,7 +121,6 @@ async def crear_sesion_pago(items: list[ProductoPago]):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-# Obtener clave pública Stripe
 @app.get("/config", tags=["Stripe"])
 async def obtener_clave_publica_stripe():
     clave_publica = os.getenv("CLAVE_PUBLICA_STRIPE")
