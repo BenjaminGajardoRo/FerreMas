@@ -44,6 +44,14 @@ class ProductoPago(BaseModel):
     cantidad: int
     moneda: str
 
+class ProductoNuevo(BaseModel):
+    nombre: str
+    descripcion: str
+    precio: int
+    categoria: str
+    stock: int
+    moneda: str
+
 # Función para verificar token general
 def verificar_token_general(x_authentication: str = Header(None, alias="x-authentication")):
     if x_authentication != FIXED_TOKEN:
@@ -180,3 +188,15 @@ async def listar_promociones(token: str = Depends(verificar_token_general)):
 @app.post("/data/contacto/vendedor", tags=["Contacto"])
 async def contacto_vendedor(mensaje: dict, token: str = Depends(verificar_token_general)):
     return await enviar_a_api_post("/data/contacto/vendedor", mensaje, token)
+
+@app.get("/data/vendedores/bySucursal", tags=["Vendedores"])
+async def listar_vendedores_por_sucursal(
+    sucursal_id: str = Query(..., alias="sucursalId"),
+    token: str = Depends(verificar_token_general),
+    vendor_token: str = Depends(verificar_token_vendedor)
+):
+    return await obtener_desde_api(f"/data/vendedores?sucursalId={sucursal_id}", token)
+
+@app.post("/data/articulos", tags=["Articulos"])
+async def agregar_producto(producto: ProductoNuevo, token: str = Depends(verificar_token_general)):
+    return await enviar_a_api_post("/data/articulos", producto.dict(), token)
