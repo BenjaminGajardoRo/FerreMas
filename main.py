@@ -22,11 +22,11 @@ app.add_middleware(
 
 load_dotenv()
 
-API_BASE = os.getenv("API_BASE")
-FIXED_TOKEN = os.getenv("TOKEN_FIJO")
-VENDOR_ALLOW_TOKEN = os.getenv("TOKEN_VENDEDOR_PERMITIDO")
-VENDOR_DENY_TOKEN = os.getenv("TOKEN_VENDEDOR_DENEGADO")
-FX_API_KEY = os.getenv("TOKEN_FXRATESAPI")
+API_URL = os.getenv("API_BASE")
+MAIN_TOKEN = os.getenv("TOKEN_FIJO")
+SELLER_TOKEN_OK = os.getenv("TOKEN_VENDEDOR_PERMITIDO")
+SELLER_TOKEN_BLOCKED = os.getenv("TOKEN_VENDEDOR_DENEGADO")
+FX_TOKEN = os.getenv("TOKEN_FXRATESAPI")
 stripe.api_key = os.getenv("CLAVE_SECRETA_STRIPE")
 
 # Usuarios permitidos
@@ -36,6 +36,8 @@ usuarios_autorizados = [
     {"usuario": "stripe_sa", "contrasena": "dzkQqDL9XZH33YDzhmsf", "rol": "service_account"},
     {"usuario": "Admin", "contrasena": "1234", "rol": "admin"},
 ]
+
+# PseudoDB -----------------------------------------------------------------------------------------------------
 
 class ProductoPago(BaseModel):
     id: str
@@ -51,33 +53,33 @@ class ProductoNuevo(BaseModel):
     categoria: str
     stock: int
     moneda: str
+    
+# LOGIN??? -----------------------------------------------------------------------------------------------------
 
-# Función para verificar token general
 def verificar_token_general(x_authentication: str = Header(None, alias="x-authentication")):
-    if x_authentication != FIXED_TOKEN:
+    if x_authentication != MAIN_TOKEN:
         raise HTTPException(403, "Token inválido")
     return x_authentication
-
-# Función para verificar token de vendedor
 def verificar_token_vendedor(x_vendor_token: str = Header(None, alias="x-vendor-token")):
-    if x_vendor_token != VENDOR_ALLOW_TOKEN:
+    if x_vendor_token != SELLER_TOKEN_OK:
         raise HTTPException(403, "No tienes permiso para este recurso")
     return x_vendor_token
 
 async def obtener_desde_api(path: str, token: str):
     headers = {"x-authentication": token}
     async with httpx.AsyncClient() as cliente:
-        respuesta = await cliente.get(f"{API_BASE}{path}", headers=headers)
+        respuesta = await cliente.get(f"{API_URL}{path}", headers=headers)
         return JSONResponse(status_code=respuesta.status_code, content=respuesta.json())
 
 async def enviar_a_api_post(path: str, datos: dict, token: str):
     headers = {"x-authentication": token}
     async with httpx.AsyncClient() as cliente:
-        respuesta = await cliente.post(f"{API_BASE}{path}", json=datos, headers=headers)
+        respuesta = await cliente.post(f"{API_URL}{path}", json=datos, headers=headers)
         return JSONResponse(status_code=respuesta.status_code, content=respuesta.json())
+
 async def enviar_a_api_put(path: str, headers: dict):
     async with httpx.AsyncClient() as cliente:
-        respuesta = await cliente.put(f"{API_BASE}{path}", headers=headers)
+        respuesta = await cliente.put(f"{API_URL}{path}", headers=headers)
         return JSONResponse(status_code=respuesta.status_code, content=respuesta.json())
 
 @app.post("/autenticacion", tags=["Auth"])
@@ -86,16 +88,18 @@ async def login_usuario(credenciales: dict):
     contrasena = credenciales.get("password")
     for u in usuarios_autorizados:
         if u["usuario"] == usuario and u["contrasena"] == contrasena:
-            token_vendedor = VENDOR_DENY_TOKEN if u["rol"] == "service_account" else VENDOR_ALLOW_TOKEN
-            return {"token": FIXED_TOKEN, "rol": u["rol"], "vendorToken": token_vendedor}
+            token_vendedor = SELLER_TOKEN_BLOCKED if u["rol"] == "service_account" else SELLER_TOKEN_OK
+            return {"token": MAIN_TOKEN, "rol": u["rol"], "vendorToken": token_vendedor}
     raise HTTPException(status_code=401, detail="Credenciales inválidas")
     
+# DIVISAS -----------------------------------------------------------------------------------------------------    
+
 @app.get("/currency", tags=["Divisas"])
 async def convertir_divisa(
     moneda_origen: str = Query(..., min_length=3, max_length=3),
     moneda_destino: str = Query(..., min_length=3, max_length=3)
 ):
-    url_fx = f"https://fxratesapi.com/api/latest?base={moneda_origen.upper()}&symbols={moneda_destino.upper()}&api_key={FX_API_KEY}"
+    url_fx = f"https://fxratesapi.com/api/latest?base={moneda_origen.upper()}&symbols={moneda_destino.upper()}&api_key={FX_TOKEN}"
     async with httpx.AsyncClient() as cliente:
         respuesta = await cliente.get(url_fx)
     if respuesta.status_code != 200:
@@ -105,6 +109,8 @@ async def convertir_divisa(
     if tasa is None:
         raise HTTPException(status_code=400, detail="Código de moneda inválido")
     return {"rate": tasa}
+    
+# STRIPE -----------------------------------------------------------------------------------------------------
 
 @app.post("/create-checkout-session", tags=["Stripe"])
 async def crear_sesion_pago(items: list[ProductoPago]):
@@ -124,7 +130,6 @@ async def crear_sesion_pago(items: list[ProductoPago]):
             line_items=line_items,
             success_url="https://tusitio.com/success",
             cancel_url="https://tusitio.com/cancel"
-            "https://docs.stripe.com/payments/checkout/custom-success-page?payment-ui=stripe-hosted",
         )
         return {"url": sesion_pago.url}
     except Exception as e:
@@ -136,6 +141,9 @@ async def obtener_clave_publica_stripe():
     if not clave_publica:
         raise HTTPException(status_code=500, detail="Clave pública de Stripe no configurada")
     return {"publicKey": clave_publica}
+
+# Endpoints -----------------------------------------------------------------------------------------------------
+
 
 # Endpoints para artículos
 @app.get("/data/articulos", tags=["Articulos"])
@@ -184,7 +192,7 @@ async def listar_novedades(token: str = Depends(verificar_token_general)):
 async def listar_promociones(token: str = Depends(verificar_token_general)):
     return await obtener_desde_api("/data/articulos/promociones", token)
 
-# Endpoint contacto vendedor (POST)
+# Endpoint contacto vendedor
 @app.post("/data/contacto/vendedor", tags=["Contacto"])
 async def contacto_vendedor(mensaje: dict, token: str = Depends(verificar_token_general)):
     return await enviar_a_api_post("/data/contacto/vendedor", mensaje, token)
@@ -200,3 +208,5 @@ async def listar_vendedores_por_sucursal(
 @app.post("/data/articulos", tags=["Articulos"])
 async def agregar_producto(producto: ProductoNuevo, token: str = Depends(verificar_token_general)):
     return await enviar_a_api_post("/data/articulos", producto.dict(), token)
+
+# Endpoints -----------------------------------------------------------------------------------------------------
